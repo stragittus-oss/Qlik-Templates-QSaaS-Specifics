@@ -8,47 +8,75 @@ Sub RemoveSysAttributes
 	
 	----------------------------------------------------------------------------------------------------
 	    SUBROUTINE: RemoveSysAttributes
+	    VERSION: 1.1.0
 	----------------------------------------------------------------------------------------------------
 	
 	    PURPOSE:
-	        Clears all previously assigned system context variables used to store metadata about the
-	        current Qlik Sense execution environment (app, space, customer, project, environment, etc.).
-	        Each __SYS__* variable is reset to Null() so no stale values remain in subsequent script
-	        logic or reloads.
+	        Resets all system-level context variables (__SYS__*) to Null(), effectively clearing
+	        metadata about the current Qlik Sense environment. This prevents stale values from
+	        persisting between reloads or environment switches.
 	
 	    DESCRIPTION:
-	        The subroutine explicitly sets the following variables to Null():
-	            - __SYS__AppId
-	            - __SYS__AppName
-	            - __SYS__SpaceName
-	            - __SYS__SpaceType
-	            - __SYS__Customer
-	            - __SYS__Project
-	            - __SYS__Environment
-	            - __SYS__DataSpace
-	            - __SYS__SpaceDataDir
-	            - __SYS__AppDataDir
+	        The subroutine explicitly nullifies all attributes related to:
+	            • Qlik Platform and Engine
+	            • Tenant identification and URLs
+	            • Space metadata (ID, Name, Type, DataDir)
+	            • Project context (Customer, Project, Environment, DataSpace)
+	            • Application metadata (AppId, AppName, AppDataDir)
+	            • Staging timestamp (__SYS__StgLdts)
+	
+	        Variables cleared:
+	            __SYS__QlikPlatform
+	            __SYS__EngineVersion
+	            __SYS__TenantId
+	            __SYS__TenantName
+	            __SYS__TenantUrl
+	            __SYS__TenantUrlAlias
+	            __SYS__TenantRegion
+	            __SYS__SpaceId
+	            __SYS__SpaceName
+	            __SYS__SpaceType
+	            __SYS__SpaceDataDir
+	            __SYS__Customer
+	            __SYS__Project
+	            __SYS__Environment
+	            __SYS__DataSpace
+	            __SYS__AppId
+	            __SYS__AppName
+	            __SYS__AppDataDir
+	            __SYS__StgLdts
 	
 	    USAGE:
-	        Call this subroutine whenever you need to clear existing system attributes.
+	        Use this subroutine to fully reset the system context before re-initializing
+	        environment variables or running environment-agnostic routines.
+	
 	        Example:
 	            CALL RemoveSysAttributes;
 	
 	----------------------------------------------------------------------------------------------------
 	
 	*/
-	
-	LET __SYS__AppId			 = Null();
-	LET __SYS__AppName			 = Null();
-	LET __SYS__SpaceName		 = Null();
-	LET __SYS__SpaceType		 = Null();
-	LET __SYS__Customer			 = Null();
-	LET __SYS__Project			 = Null();
-	LET __SYS__Environment		 = Null();
-	LET __SYS__DataSpace		 = Null();
-	LET __SYS__SpaceDataDir		 = Null();
-	LET __SYS__AppDataDir		 = Null();
-	
+
+	LET __SYS__QlikPlatform		= Null();
+	LET __SYS__EngineVersion	= Null();
+	LET __SYS__TenantId			= Null();
+	LET __SYS__TenantName		= Null();
+	LET __SYS__TenantUrl		= Null();
+	LET __SYS__TenantUrlAlias	= Null();
+	LET __SYS__TenantRegion		= Null();
+	LET __SYS__SpaceId			= Null();
+	LET __SYS__SpaceName		= Null();
+	LET __SYS__SpaceType		= Null();
+	LET __SYS__SpaceDataDir		= Null();
+	LET __SYS__Customer			= Null();
+	LET __SYS__Project			= Null();
+	LET __SYS__Environment		= Null();
+	LET __SYS__DataSpace		= Null();
+	LET __SYS__AppId			= Null();
+	LET __SYS__AppName			= Null();
+	LET __SYS__AppDataDir		= Null();
+	LET __SYS__StgLdts			= Null();
+
 End Sub
 
 /*******************************************************************************************************/

@@ -8,24 +8,32 @@ Sub GetSysAttributes (pKeepSysTable)
 	
 	----------------------------------------------------------------------------------------------------
 	    SUBROUTINE: GetSysAttributes
+	    VERSION: 1.1.0
 	----------------------------------------------------------------------------------------------------
 	
 	    PURPOSE
-	        Detects the current Qlik Sense execution context (space, project, customer, environment),
-	        derives a logical data space, and exposes all values as global script variables.
+	        Detects the current Qlik Sense runtime context (tenant, space, customer, project, environment),
+	        derives a logical DataSpace, computes data directories, and exposes all results as global
+	        __SYS__* variables for use across the script.
 	
 	    DESCRIPTION
-	        1) Reads engine context via GetSysAttr('spaceName'|'spaceType').
-	        2) Parses space name "Customer.Project.Env" → Customer, Project, Environment.
-	        3) Defaults Environment to "PRD" when missing.
-	        4) Detects personal context (empty spaceName) and normalizes:
-	           __SYS__SpaceName="Personal", __SYS__SpaceType="PERSONAL".
-	        5) Derives __SYS__DataSpace = Customer.Project.Data.Environment.
-	        6) Computes directories:
-	           __SYS__SpaceDataDir = lib://<DataSpace>:DataFiles
-	           __SYS__AppDataDir   = lib://<DataSpace>:DataFiles/<AppName>
-	        7) Loads all results into temp table __SYS__Attributes and assigns each field
-	           as an identically named global variable, then optionally drops the table.
+	        1) Seeds platform/app/engine/tenant context:
+	           - __SYS__QlikPlatform='QSaas'
+	           - __SYS__AppId=DocumentName(), __SYS__AppName=DocumentTitle()
+	           - __SYS__EngineVersion=EngineVersion(), __SYS__StgLdts=Timestamp(Now(), 'YYYY-MM-DD hh:mm:ss')
+	           - Reads tenant & space attributes via GetSysAttr(...): tenantId/Name/Url/UrlAlias/Region, spaceId/Name/Type
+	        2) Detects personal context when spaceName is empty:
+	           - IsPersonalFg=1 → __SYS__SpaceId=-1, __SYS__SpaceName='Personal', __SYS__SpaceType='PERSONAL'
+	        3) Parses space naming "Customer.Project.Environment":
+	           - __SYS__Customer=SubField(__SYS__SpaceName, '.', 1)
+	           - __SYS__Project =SubField(__SYS__SpaceName, '.', 2)
+	           - __SYS__Environment defaults to 'PRD' when the 3rd token is empty
+	        4) Derives logical data space and folders:
+	           - __SYS__DataSpace    = Customer.Project.Data.Environment
+	           - __SYS__SpaceDataDir = lib://<DataSpace>:DataFiles
+	           - __SYS__AppDataDir   = lib://<DataSpace>:DataFiles/<AppName>
+	        5) Materializes all results into temp table __SYS__Attributes and assigns each field to a
+	           same-named global variable. Table is dropped by default (see parameter).
 	
 	    PARAMETER
 	        pKeepSysTable
@@ -33,20 +41,29 @@ Sub GetSysAttributes (pKeepSysTable)
 	            1 → keep __SYS__Attributes (for debugging/inspection)
 	
 	    OUTPUT VARIABLES (globals)
-	        __SYS__AppId          → DocumentName()
-	        __SYS__AppName        → DocumentTitle()
-	        __SYS__SpaceName      → e.g. "Customer.Project.PRD" or "Personal"
-	        __SYS__SpaceType      → "MANAGED" | "SHARED" | "PERSONAL"
-	        __SYS__Customer       → first token of space name
-	        __SYS__Project        → second token of space name
-	        __SYS__Environment    → third token, defaults to "PRD" if absent
-	        __SYS__DataSpace      → "Customer.Project.Data.PRD"
-	        __SYS__SpaceDataDir   → lib://Customer.Project.Data.PRD:DataFiles
-	        __SYS__AppDataDir     → lib://Customer.Project.Data.PRD:DataFiles/<AppName>
+	        __SYS__QlikPlatform     → 'QSaas'
+	        __SYS__EngineVersion    → EngineVersion()
+	        __SYS__TenantId         → GetSysAttr('tenantId')
+	        __SYS__TenantName       → GetSysAttr('tenantName')
+	        __SYS__TenantUrl        → GetSysAttr('tenantUrl')
+	        __SYS__TenantUrlAlias   → GetSysAttr('tenantUrlAlias')
+	        __SYS__TenantRegion     → GetSysAttr('tenantRegion')
+	        __SYS__SpaceId          → GetSysAttr('spaceId') or -1 if personal
+	        __SYS__SpaceName        → e.g. "Customer.Project.PRD" or "Personal"
+	        __SYS__SpaceType        → "MANAGED" | "SHARED" | "PERSONAL"
+	        __SYS__Customer         → first token of space name
+	        __SYS__Project          → second token of space name
+	        __SYS__Environment      → third token; defaults to "PRD" if absent
+	        __SYS__DataSpace        → "Customer.Project.Data.PRD"
+	        __SYS__SpaceDataDir     → lib://Customer.Project.Data.PRD:DataFiles
+	        __SYS__AppDataDir       → lib://Customer.Project.Data.PRD:DataFiles/<AppName>
+	        __SYS__AppId            → DocumentName()
+	        __SYS__AppName          → DocumentTitle()
+	        __SYS__StgLdts          → load timestamp
 	
 	    DEPENDENCIES
 	        - GetSysAttr() available (Qlik Cloud / QSE)
-	        - Space naming convention: "Customer.Project.Environment"
+	        - Space naming convention "Customer.Project.Environment" for non-personal spaces
 	
 	    SIDE EFFECTS
 	        - Creates (and optionally drops) __SYS__Attributes
@@ -72,16 +89,25 @@ Sub GetSysAttributes (pKeepSysTable)
 	__SYS__Attributes:
     NoConcatenate
     Load
-    	__SYS__AppId													,
-        __SYS__AppName													,
-        __SYS__SpaceName												,
+    	__SYS__QlikPlatform												,
+        __SYS__EngineVersion											,
+		__SYS__TenantId													,
+		__SYS__TenantName												,
+		__SYS__TenantUrl												,
+		__SYS__TenantUrlAlias											,
+		__SYS__TenantRegion												,
+		__SYS__SpaceId													,
+		__SYS__SpaceName												,
         __SYS__SpaceType												,
+        __SYS__SpaceDataDir												,
         __SYS__Customer													,
         __SYS__Project													,
         __SYS__Environment												,
         __SYS__DataSpace												,
-        __SYS__SpaceDataDir												,
-        __SYS__AppDataDir												
+    	__SYS__AppId													,
+        __SYS__AppName													,
+        __SYS__AppDataDir												,
+        __SYS__StgLdts													
     ;
     Load 
     	*,
@@ -107,6 +133,7 @@ Sub GetSysAttributes (pKeepSysTable)
     ;
     Load
     	*																,
+        If(IsPersonalFg = 1, -1, _spaceId)								AS __SYS__SpaceId,
         If(IsPersonalFg = 1, 'Personal', _spaceName)					AS __SYS__SpaceName,
 		If(IsPersonalFg = 1, 'PERSONAL', Upper(_spaceType))				AS __SYS__SpaceType
     ;
@@ -115,10 +142,19 @@ Sub GetSysAttributes (pKeepSysTable)
 		If(Len(_spaceName) = 0, 1, 0)									AS IsPersonalFg,
     ;
     Load
+    	'QSaas'															AS __SYS__QlikPlatform,
+		GetSysAttr('tenantId')											AS __SYS__TenantId,
+		GetSysAttr('tenantName')										AS __SYS__TenantName,
+		GetSysAttr('tenantUrl')											AS __SYS__TenantUrl,
+		GetSysAttr('tenantUrlAlias')									AS __SYS__TenantUrlAlias,
+        GetSysAttr('tenantRegion')										AS __SYS__TenantRegion,
+		GetSysAttr('spaceId')											AS _spaceId,
+		GetSysAttr('spaceName')											AS _spaceName,
+		GetSysAttr('spaceType')											AS _spaceType,
     	DocumentName()													AS __SYS__AppId,
         DocumentTitle()													AS __SYS__AppName,
-		GetSysAttr('spaceName')											AS _spaceName,
-		GetSysAttr('spaceType')											AS _spaceType
+        EngineVersion()													AS __SYS__EngineVersion,
+        Timestamp(Now(), 'YYYY-MM-DD hh:mm:ss')							AS __SYS__StgLdts
 	AutoGenerate
     	1
 	;
@@ -128,8 +164,6 @@ Sub GetSysAttributes (pKeepSysTable)
     	Let _currField.Name		= FieldName(_i,'__SYS__Attributes');
         Let _currField.Value	= Peek(_currField.Name, 0, __SYS__Attributes);
         Let $(_currField.Name) 	= _currField.Value;
-        
-        Trace $(_currField.Name) : $(_currField.Value);
         
     Next _i
 
@@ -158,47 +192,75 @@ Sub RemoveSysAttributes
 	
 	----------------------------------------------------------------------------------------------------
 	    SUBROUTINE: RemoveSysAttributes
+	    VERSION: 1.1.0
 	----------------------------------------------------------------------------------------------------
 	
 	    PURPOSE:
-	        Clears all previously assigned system context variables used to store metadata about the
-	        current Qlik Sense execution environment (app, space, customer, project, environment, etc.).
-	        Each __SYS__* variable is reset to Null() so no stale values remain in subsequent script
-	        logic or reloads.
+	        Resets all system-level context variables (__SYS__*) to Null(), effectively clearing
+	        metadata about the current Qlik Sense environment. This prevents stale values from
+	        persisting between reloads or environment switches.
 	
 	    DESCRIPTION:
-	        The subroutine explicitly sets the following variables to Null():
-	            - __SYS__AppId
-	            - __SYS__AppName
-	            - __SYS__SpaceName
-	            - __SYS__SpaceType
-	            - __SYS__Customer
-	            - __SYS__Project
-	            - __SYS__Environment
-	            - __SYS__DataSpace
-	            - __SYS__SpaceDataDir
-	            - __SYS__AppDataDir
+	        The subroutine explicitly nullifies all attributes related to:
+	            • Qlik Platform and Engine
+	            • Tenant identification and URLs
+	            • Space metadata (ID, Name, Type, DataDir)
+	            • Project context (Customer, Project, Environment, DataSpace)
+	            • Application metadata (AppId, AppName, AppDataDir)
+	            • Staging timestamp (__SYS__StgLdts)
+	
+	        Variables cleared:
+	            __SYS__QlikPlatform
+	            __SYS__EngineVersion
+	            __SYS__TenantId
+	            __SYS__TenantName
+	            __SYS__TenantUrl
+	            __SYS__TenantUrlAlias
+	            __SYS__TenantRegion
+	            __SYS__SpaceId
+	            __SYS__SpaceName
+	            __SYS__SpaceType
+	            __SYS__SpaceDataDir
+	            __SYS__Customer
+	            __SYS__Project
+	            __SYS__Environment
+	            __SYS__DataSpace
+	            __SYS__AppId
+	            __SYS__AppName
+	            __SYS__AppDataDir
+	            __SYS__StgLdts
 	
 	    USAGE:
-	        Call this subroutine whenever you need to clear existing system attributes.
+	        Use this subroutine to fully reset the system context before re-initializing
+	        environment variables or running environment-agnostic routines.
+	
 	        Example:
 	            CALL RemoveSysAttributes;
 	
 	----------------------------------------------------------------------------------------------------
 	
 	*/
-	
-	LET __SYS__AppId			 = Null();
-	LET __SYS__AppName			 = Null();
-	LET __SYS__SpaceName		 = Null();
-	LET __SYS__SpaceType		 = Null();
-	LET __SYS__Customer			 = Null();
-	LET __SYS__Project			 = Null();
-	LET __SYS__Environment		 = Null();
-	LET __SYS__DataSpace		 = Null();
-	LET __SYS__SpaceDataDir		 = Null();
-	LET __SYS__AppDataDir		 = Null();
-	
+
+	LET __SYS__QlikPlatform		= Null();
+	LET __SYS__EngineVersion	= Null();
+	LET __SYS__TenantId			= Null();
+	LET __SYS__TenantName		= Null();
+	LET __SYS__TenantUrl		= Null();
+	LET __SYS__TenantUrlAlias	= Null();
+	LET __SYS__TenantRegion		= Null();
+	LET __SYS__SpaceId			= Null();
+	LET __SYS__SpaceName		= Null();
+	LET __SYS__SpaceType		= Null();
+	LET __SYS__SpaceDataDir		= Null();
+	LET __SYS__Customer			= Null();
+	LET __SYS__Project			= Null();
+	LET __SYS__Environment		= Null();
+	LET __SYS__DataSpace		= Null();
+	LET __SYS__AppId			= Null();
+	LET __SYS__AppName			= Null();
+	LET __SYS__AppDataDir		= Null();
+	LET __SYS__StgLdts			= Null();
+
 End Sub
 
 /*******************************************************************************************************/
